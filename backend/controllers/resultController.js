@@ -68,6 +68,16 @@ exports.getClassAnalytics = async (req, res, next) => {
 
     const results = await Result.find(resultQuery).populate('studentId', 'name rollNumber section');
 
+    const getGrade = (pct) => {
+      if (pct >= 90) return 'A+';
+      if (pct >= 80) return 'A';
+      if (pct >= 70) return 'B+';
+      if (pct >= 60) return 'B';
+      if (pct >= 50) return 'C';
+      if (pct >= 33) return 'D';
+      return 'F';
+    };
+
     const analytics = {
       totalStudents: studentIds.length,
       totalResults: results.length,
@@ -77,12 +87,24 @@ exports.getClassAnalytics = async (req, res, next) => {
         ? parseFloat((results.reduce((s, r) => s + r.percentage, 0) / results.length).toFixed(2))
         : 0,
       gradeDistribution: results.reduce((acc, r) => {
-        acc[r.grade] = (acc[r.grade] || 0) + 1;
+        const grade = r.grade || getGrade(r.percentage);
+        acc[grade] = (acc[grade] || 0) + 1;
         return acc;
       }, {}),
     };
 
-    res.json({ success: true, analytics, data: results });
+    const studentList = results.map(r => ({
+      name: r.studentId?.name || '-',
+      rollNumber: r.studentId?.rollNumber || '-',
+      section: r.studentId?.section || '-',
+      percentage: r.percentage,
+      grade: r.grade || getGrade(r.percentage),
+      isPassed: r.isPassed,
+      examType: r.examType,
+      academicYear: r.academicYear,
+    }));
+
+    res.json({ success: true, analytics, students: studentList, data: results });
   } catch (err) {
     next(err);
   }

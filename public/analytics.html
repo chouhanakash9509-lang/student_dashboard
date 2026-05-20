@@ -40,6 +40,10 @@
     <div style="max-width:380px;margin:24px auto 0;">
         <canvas id="gradeChart"></canvas>
     </div>
+    <h4 style="margin-top:24px;">Student Results</h4>
+    <table id="studentResultsTable" style="width:100%;border-collapse:collapse;">
+        <tr><th>Name</th><th>Roll No</th><th>Section</th><th>Exam Type</th><th>Percentage</th><th>Grade</th><th>Status</th></tr>
+    </table>
 </div>
 
 <h3 style="margin-top:30px;">Top Performers</h3>
@@ -90,19 +94,44 @@ async function loadAnalytics() {
             const grades = Object.keys(a.gradeDistribution);
             const counts = Object.values(a.gradeDistribution);
             const colors = ['#4CAF50','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FF5722'];
-            window._gradeChart = new Chart(document.getElementById('gradeChart'), {
-                type: 'pie',
-                data: {
-                    labels: grades,
-                    datasets: [{ data: counts, backgroundColor: colors.slice(0, grades.length), borderWidth: 2 }]
-                },
-                options: {
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        title: { display: true, text: 'Grade Distribution', font: { size: 16 } }
+            if (grades.length > 0) {
+                window._gradeChart = new Chart(document.getElementById('gradeChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: grades,
+                        datasets: [{ data: counts, backgroundColor: colors.slice(0, grades.length), borderWidth: 2 }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            title: { display: true, text: 'Grade Distribution', font: { size: 16 } }
+                        }
                     }
-                }
-            });
+                });
+            }
+
+            // Populate student results table
+            const sTable = document.getElementById('studentResultsTable');
+            while (sTable.rows.length > 1) sTable.deleteRow(1);
+            if (data.students && data.students.length > 0) {
+                data.students.forEach(s => {
+                    const row = sTable.insertRow();
+                    row.innerHTML = `
+                        <td>${s.name}</td>
+                        <td>${s.rollNumber}</td>
+                        <td>${s.section}</td>
+                        <td>${s.examType}</td>
+                        <td>${s.percentage}%</td>
+                        <td>${s.grade}</td>
+                        <td style="color:${s.isPassed ? 'green' : 'red'}">${s.isPassed ? 'Pass' : 'Fail'}</td>
+                    `;
+                });
+            } else {
+                const row = sTable.insertRow();
+                row.innerHTML = '<td colspan="7">No student results found.</td>';
+            }
+
+            loadToppers(cls, section, examType, academicYear);
         } else {
             statusMsg.textContent = data.message || 'No data found.';
             document.getElementById('analytics-result').style.display = 'none';
@@ -112,11 +141,15 @@ async function loadAnalytics() {
     }
 }
 
-async function loadToppers() {
+async function loadToppers(cls = '', section = '', examType = '', academicYear = '') {
     try {
-        const res = await fetch(`${API}/results/analytics/toppers?limit=5`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        let url = `${API}/results/analytics/toppers?limit=5`;
+        if (cls) url += `&class=${encodeURIComponent(cls)}`;
+        if (section) url += `&section=${encodeURIComponent(section)}`;
+        if (examType) url += `&examType=${encodeURIComponent(examType)}`;
+        if (academicYear) url += `&academicYear=${encodeURIComponent(academicYear)}`;
+
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         const table = document.getElementById('toppersTable');
         while (table.rows.length > 1) table.deleteRow(1);
