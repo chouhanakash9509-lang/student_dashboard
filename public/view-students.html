@@ -3,26 +3,29 @@
 <head>
 <title>View Students</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.marks-panel { display:none; background:#f0f4ff; border:1px solid #c5cae9; border-radius:8px; padding:16px; margin-top:8px; }
+.subject-row { display:flex; gap:8px; margin-bottom:8px; }
+.subject-row input { flex:1; padding:7px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+.subject-row button { padding:6px 12px; border-radius:6px; border:none; background:#e53935; color:white; cursor:pointer; }
+.add-sub-btn { padding:6px 14px; border-radius:6px; border:none; background:#1976D2; color:white; cursor:pointer; margin-bottom:12px; font-size:13px; }
+.submit-marks-btn { padding:8px 18px; border-radius:6px; border:none; background:#4CAF50; color:white; cursor:pointer; font-size:14px; }
+.marks-msg { font-size:13px; margin-top:8px; }
+select.marks-select { padding:7px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+</style>
 </head>
-
 <body>
-
 <div class="container">
 
 <h2>Students List</h2>
 <a href="Dashbord.html">← Back to Dashboard</a>
 
 <input type="text" id="search" placeholder="Search student..." class="search" oninput="searchStudents()">
-
 <p id="status-msg" style="color:gray;"></p>
 
 <table id="studentsTable">
 <tr>
-<th>Roll No</th>
-<th>Name</th>
-<th>Class</th>
-<th>Section</th>
-<th>Action</th>
+    <th>Roll No</th><th>Name</th><th>Class</th><th>Section</th><th>Actions</th>
 </tr>
 </table>
 
@@ -31,8 +34,9 @@
 <script>
 const API = '/api';
 const token = localStorage.getItem('token');
-
 if (!token) window.location.href = 'index.html';
+
+let allStudents = [];
 
 async function loadStudents(search = '') {
     const statusMsg = document.getElementById('status-msg');
@@ -40,32 +44,131 @@ async function loadStudents(search = '') {
     const url = search ? `${API}/students?search=${encodeURIComponent(search)}` : `${API}/students`;
 
     try {
-        const res = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
+        allStudents = data.data || [];
         const table = document.getElementById('studentsTable');
-
-        // Remove old rows except header
         while (table.rows.length > 1) table.deleteRow(1);
 
-        if (data.success && data.data.length > 0) {
+        if (data.success && allStudents.length > 0) {
             statusMsg.textContent = `Total: ${data.total} students`;
-            data.data.forEach(s => {
-                const row = table.insertRow();
-                row.innerHTML = `
-                    <td>${s.rollNumber}</td>
-                    <td>${s.name}</td>
-                    <td>${s.class}</td>
-                    <td>${s.section}</td>
-                    <td><button onclick="deleteStudent('${s._id}')">Delete</button></td>
-                `;
-            });
+            allStudents.forEach(s => renderStudentRow(table, s));
         } else {
             statusMsg.textContent = 'No students found.';
         }
-    } catch (err) {
+    } catch {
         statusMsg.textContent = 'Cannot connect to server.';
+    }
+}
+
+function renderStudentRow(table, s) {
+    const row = table.insertRow();
+    row.id = `row-${s._id}`;
+    row.innerHTML = `
+        <td>${s.rollNumber}</td>
+        <td>${s.name}</td>
+        <td>${s.class}</td>
+        <td>${s.section}</td>
+        <td>
+            <button onclick="toggleMarksPanel('${s._id}')" style="padding:5px 12px;border-radius:6px;border:none;background:#1976D2;color:white;cursor:pointer;margin-right:6px;">Add Marks</button>
+            <button onclick="deleteStudent('${s._id}')" style="padding:5px 12px;border-radius:6px;border:none;background:#e53935;color:white;cursor:pointer;">Delete</button>
+        </td>
+    `;
+
+    // Insert marks panel row right below student row
+    const panelRow = table.insertRow();
+    panelRow.id = `panel-${s._id}`;
+    const cell = panelRow.insertCell();
+    cell.colSpan = 5;
+    cell.innerHTML = `
+        <div class="marks-panel" id="marks-${s._id}">
+            <strong>Add Marks for ${s.name}</strong>
+            <div style="display:flex;gap:10px;margin:10px 0 8px;flex-wrap:wrap;">
+                <select class="marks-select" id="examType-${s._id}">
+                    <option value="">Select Exam Type</option>
+                    <option value="unit-test">Unit Test</option>
+                    <option value="mid-term">Mid Term</option>
+                    <option value="final">Final</option>
+                </select>
+                <input type="text" id="year-${s._id}" placeholder="Academic Year (e.g. 2024-25)" style="padding:7px;border-radius:6px;border:1px solid #ccc;font-size:14px;">
+            </div>
+            <div id="subjects-${s._id}">
+                <div class="subject-row">
+                    <input type="text" placeholder="Subject Name" class="sname">
+                    <input type="number" placeholder="Marks" class="smarks" min="0" max="100">
+                    <input type="number" placeholder="Max Marks" class="smax" value="100" min="1">
+                </div>
+            </div>
+            <button class="add-sub-btn" onclick="addSubject('${s._id}')">+ Add Subject</button>
+            <br>
+            <button class="submit-marks-btn" onclick="submitMarks('${s._id}')">Save to Database</button>
+            <div class="marks-msg" id="msg-${s._id}"></div>
+        </div>
+    `;
+}
+
+function toggleMarksPanel(id) {
+    const panel = document.getElementById(`marks-${id}`);
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+function addSubject(id) {
+    const div = document.createElement('div');
+    div.className = 'subject-row';
+    div.innerHTML = `
+        <input type="text" placeholder="Subject Name" class="sname">
+        <input type="number" placeholder="Marks" class="smarks" min="0" max="100">
+        <input type="number" placeholder="Max Marks" class="smax" value="100" min="1">
+        <button onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.getElementById(`subjects-${id}`).appendChild(div);
+}
+
+async function submitMarks(studentId) {
+    const msgEl = document.getElementById(`msg-${studentId}`);
+    const examType = document.getElementById(`examType-${studentId}`).value;
+    const academicYear = document.getElementById(`year-${studentId}`).value.trim();
+
+    if (!examType) { msgEl.style.color = 'red'; msgEl.textContent = 'Select exam type.'; return; }
+    if (!academicYear) { msgEl.style.color = 'red'; msgEl.textContent = 'Enter academic year.'; return; }
+
+    const panel = document.getElementById(`marks-${studentId}`);
+    const names = [...panel.querySelectorAll('.sname')].map(i => i.value.trim());
+    const marks = [...panel.querySelectorAll('.smarks')].map(i => Number(i.value));
+    const maxMarks = [...panel.querySelectorAll('.smax')].map(i => Number(i.value));
+
+    if (names.some(n => !n) || marks.some(m => isNaN(m) || m === '')) {
+        msgEl.style.color = 'red'; msgEl.textContent = 'Fill all subject names and marks.'; return;
+    }
+
+    const subjects = names.map((name, i) => ({ name, marks: marks[i], maxMarks: maxMarks[i] }));
+
+    try {
+        const res = await fetch(`${API}/results`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ studentId, examType, academicYear, subjects })
+        });
+        const data = await res.json();
+        if (data.success) {
+            msgEl.style.color = 'green';
+            msgEl.textContent = `✓ Saved! Percentage: ${data.data.percentage}% | Grade: ${data.data.grade}`;
+            // Reset form
+            document.getElementById(`examType-${studentId}`).value = '';
+            document.getElementById(`year-${studentId}`).value = '';
+            document.getElementById(`subjects-${studentId}`).innerHTML = `
+                <div class="subject-row">
+                    <input type="text" placeholder="Subject Name" class="sname">
+                    <input type="number" placeholder="Marks" class="smarks" min="0" max="100">
+                    <input type="number" placeholder="Max Marks" class="smax" value="100" min="1">
+                </div>`;
+        } else {
+            msgEl.style.color = 'red';
+            msgEl.textContent = (data.errors ? data.errors.join(', ') : data.message) || 'Failed to save.';
+        }
+    } catch {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Cannot connect to server.';
     }
 }
 
@@ -77,8 +180,12 @@ async function deleteStudent(id) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
-        if (data.success) loadStudents();
-        else alert(data.message || 'Delete failed');
+        if (data.success) {
+            document.getElementById(`row-${id}`)?.remove();
+            document.getElementById(`panel-${id}`)?.remove();
+        } else {
+            alert(data.message || 'Delete failed');
+        }
     } catch {
         alert('Cannot connect to server.');
     }
@@ -92,6 +199,5 @@ function searchStudents() {
 
 loadStudents();
 </script>
-
 </body>
 </html>
