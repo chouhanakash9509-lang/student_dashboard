@@ -3,6 +3,7 @@
 <head>
 <title>Analytics</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -36,6 +37,9 @@
     <p>Average Percentage: <strong id="avgPercentage"></strong>%</p>
     <h4>Grade Distribution:</h4>
     <div id="gradeDistribution"></div>
+    <div style="max-width:380px;margin:24px auto 0;">
+        <canvas id="gradeChart"></canvas>
+    </div>
 </div>
 
 <h3 style="margin-top:30px;">Top Performers</h3>
@@ -61,6 +65,7 @@ async function loadAnalytics() {
     if (!cls) { statusMsg.textContent = 'Please enter a class.'; return; }
     statusMsg.textContent = 'Loading...';
 
+    if (window._gradeChart) { window._gradeChart.destroy(); }
     let url = `${API}/results/analytics/class?class=${encodeURIComponent(cls)}`;
     if (section) url += `&section=${encodeURIComponent(section)}`;
     if (examType) url += `&examType=${encodeURIComponent(examType)}`;
@@ -81,6 +86,23 @@ async function loadAnalytics() {
             document.getElementById('gradeDistribution').innerHTML =
                 Object.entries(a.gradeDistribution).map(([g, c]) => `<span style="margin-right:15px;"><strong>${g}:</strong> ${c}</span>`).join('');
             document.getElementById('analytics-result').style.display = 'block';
+
+            const grades = Object.keys(a.gradeDistribution);
+            const counts = Object.values(a.gradeDistribution);
+            const colors = ['#4CAF50','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FF5722'];
+            window._gradeChart = new Chart(document.getElementById('gradeChart'), {
+                type: 'pie',
+                data: {
+                    labels: grades,
+                    datasets: [{ data: counts, backgroundColor: colors.slice(0, grades.length), borderWidth: 2 }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Grade Distribution', font: { size: 16 } }
+                    }
+                }
+            });
         } else {
             statusMsg.textContent = data.message || 'No data found.';
             document.getElementById('analytics-result').style.display = 'none';
