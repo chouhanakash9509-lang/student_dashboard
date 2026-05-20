@@ -5,9 +5,7 @@
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
 <body>
-
 <div class="container">
 
 <h2>Student Performance Analytics</h2>
@@ -28,27 +26,56 @@
 
 <p id="status-msg" style="color:gray;"></p>
 
-<div id="analytics-result" style="display:none;background:#f9f9f9;padding:20px;border-radius:8px;margin-top:10px;">
-    <h3>Class Analytics</h3>
-    <p>Total Students: <strong id="totalStudents"></strong></p>
-    <p>Total Results: <strong id="totalResults"></strong></p>
-    <p>Passed: <strong id="passed" style="color:green;"></strong></p>
-    <p>Failed: <strong id="failed" style="color:red;"></strong></p>
-    <p>Average Percentage: <strong id="avgPercentage"></strong>%</p>
-    <h4>Grade Distribution:</h4>
-    <div id="gradeDistribution"></div>
-    <div style="max-width:380px;margin:24px auto 0;">
-        <canvas id="gradeChart"></canvas>
+<div id="analytics-result" style="display:none;">
+
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;">
+        <div style="background:#e8f5e9;padding:16px 24px;border-radius:8px;text-align:center;">
+            <div style="font-size:28px;font-weight:bold;color:#2e7d32;" id="totalStudents">0</div>
+            <div style="color:#555;">Total Students</div>
+        </div>
+        <div style="background:#e3f2fd;padding:16px 24px;border-radius:8px;text-align:center;">
+            <div style="font-size:28px;font-weight:bold;color:#1565c0;" id="avgPercentage">0</div>
+            <div style="color:#555;">Avg Percentage %</div>
+        </div>
+        <div style="background:#f1f8e9;padding:16px 24px;border-radius:8px;text-align:center;">
+            <div style="font-size:28px;font-weight:bold;color:#558b2f;" id="passed">0</div>
+            <div style="color:#555;">Passed</div>
+        </div>
+        <div style="background:#fce4ec;padding:16px 24px;border-radius:8px;text-align:center;">
+            <div style="font-size:28px;font-weight:bold;color:#c62828;" id="failed">0</div>
+            <div style="color:#555;">Failed</div>
+        </div>
     </div>
-    <h4 style="margin-top:24px;">Student Results</h4>
+
+    <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start;">
+
+        <!-- Pie chart: grade distribution -->
+        <div style="background:#f9f9f9;padding:20px;border-radius:8px;flex:1;min-width:280px;max-width:400px;">
+            <h4 style="margin:0 0 12px;">Grade Distribution</h4>
+            <canvas id="gradeChart"></canvas>
+        </div>
+
+        <!-- Bar chart: student name vs percentage -->
+        <div style="background:#f9f9f9;padding:20px;border-radius:8px;flex:2;min-width:300px;">
+            <h4 style="margin:0 0 12px;">Student Performance</h4>
+            <canvas id="studentChart"></canvas>
+        </div>
+
+    </div>
+
+    <!-- Student table -->
+    <h4 style="margin:28px 0 10px;">Student Results</h4>
     <table id="studentResultsTable" style="width:100%;border-collapse:collapse;">
-        <tr><th>Name</th><th>Roll No</th><th>Section</th><th>Exam Type</th><th>Percentage</th><th>Grade</th><th>Status</th></tr>
+        <tr>
+            <th>Name</th><th>Roll No</th><th>Exam Type</th><th>Percentage</th><th>Grade</th><th>Status</th>
+        </tr>
     </table>
+
 </div>
 
 <h3 style="margin-top:30px;">Top Performers</h3>
 <table id="toppersTable">
-<tr><th>Name</th><th>Roll No</th><th>Class</th><th>Percentage</th><th>Grade</th></tr>
+    <tr><th>Name</th><th>Roll No</th><th>Class</th><th>Percentage</th><th>Grade</th></tr>
 </table>
 
 </div>
@@ -56,20 +83,33 @@
 <script>
 const API = '/api';
 const token = localStorage.getItem('token');
-
 if (!token) window.location.href = 'index.html';
 
+const COLORS = ['#4CAF50','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FF5722','#795548'];
+
+function getGrade(pct) {
+    if (pct >= 90) return 'A+';
+    if (pct >= 80) return 'A';
+    if (pct >= 70) return 'B+';
+    if (pct >= 60) return 'B';
+    if (pct >= 50) return 'C';
+    if (pct >= 33) return 'D';
+    return 'F';
+}
+
 async function loadAnalytics() {
-    const cls = document.getElementById('classInput').value;
-    const section = document.getElementById('sectionInput').value;
+    const cls = document.getElementById('classInput').value.trim();
+    const section = document.getElementById('sectionInput').value.trim();
     const examType = document.getElementById('examType').value;
-    const academicYear = document.getElementById('academicYear').value;
+    const academicYear = document.getElementById('academicYear').value.trim();
     const statusMsg = document.getElementById('status-msg');
 
     if (!cls) { statusMsg.textContent = 'Please enter a class.'; return; }
     statusMsg.textContent = 'Loading...';
 
-    if (window._gradeChart) { window._gradeChart.destroy(); }
+    if (window._gradeChart) { window._gradeChart.destroy(); window._gradeChart = null; }
+    if (window._studentChart) { window._studentChart.destroy(); window._studentChart = null; }
+
     let url = `${API}/results/analytics/class?class=${encodeURIComponent(cls)}`;
     if (section) url += `&section=${encodeURIComponent(section)}`;
     if (examType) url += `&examType=${encodeURIComponent(examType)}`;
@@ -79,63 +119,83 @@ async function loadAnalytics() {
         const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
 
-        if (data.success) {
-            statusMsg.textContent = '';
-            const a = data.analytics;
-            document.getElementById('totalStudents').textContent = a.totalStudents;
-            document.getElementById('totalResults').textContent = a.totalResults;
-            document.getElementById('passed').textContent = a.passed;
-            document.getElementById('failed').textContent = a.failed;
-            document.getElementById('avgPercentage').textContent = a.averagePercentage;
-            document.getElementById('gradeDistribution').innerHTML =
-                Object.entries(a.gradeDistribution).map(([g, c]) => `<span style="margin-right:15px;"><strong>${g}:</strong> ${c}</span>`).join('');
-            document.getElementById('analytics-result').style.display = 'block';
-
-            const grades = Object.keys(a.gradeDistribution);
-            const counts = Object.values(a.gradeDistribution);
-            const colors = ['#4CAF50','#2196F3','#FF9800','#9C27B0','#F44336','#00BCD4','#FF5722'];
-            if (grades.length > 0) {
-                window._gradeChart = new Chart(document.getElementById('gradeChart'), {
-                    type: 'pie',
-                    data: {
-                        labels: grades,
-                        datasets: [{ data: counts, backgroundColor: colors.slice(0, grades.length), borderWidth: 2 }]
-                    },
-                    options: {
-                        plugins: {
-                            legend: { position: 'bottom' },
-                            title: { display: true, text: 'Grade Distribution', font: { size: 16 } }
-                        }
-                    }
-                });
-            }
-
-            // Populate student results table
-            const sTable = document.getElementById('studentResultsTable');
-            while (sTable.rows.length > 1) sTable.deleteRow(1);
-            if (data.students && data.students.length > 0) {
-                data.students.forEach(s => {
-                    const row = sTable.insertRow();
-                    row.innerHTML = `
-                        <td>${s.name}</td>
-                        <td>${s.rollNumber}</td>
-                        <td>${s.section}</td>
-                        <td>${s.examType}</td>
-                        <td>${s.percentage}%</td>
-                        <td>${s.grade}</td>
-                        <td style="color:${s.isPassed ? 'green' : 'red'}">${s.isPassed ? 'Pass' : 'Fail'}</td>
-                    `;
-                });
-            } else {
-                const row = sTable.insertRow();
-                row.innerHTML = '<td colspan="7">No student results found.</td>';
-            }
-
-            loadToppers(cls, section, examType, academicYear);
-        } else {
+        if (!data.success) {
             statusMsg.textContent = data.message || 'No data found.';
             document.getElementById('analytics-result').style.display = 'none';
+            return;
         }
+
+        statusMsg.textContent = '';
+        const a = data.analytics;
+        document.getElementById('totalStudents').textContent = a.totalStudents;
+        document.getElementById('avgPercentage').textContent = a.averagePercentage;
+        document.getElementById('passed').textContent = a.passed;
+        document.getElementById('failed').textContent = a.failed;
+        document.getElementById('analytics-result').style.display = 'block';
+
+        // Pie chart — grade distribution
+        const grades = Object.keys(a.gradeDistribution);
+        const gradeCounts = Object.values(a.gradeDistribution);
+        if (grades.length > 0) {
+            window._gradeChart = new Chart(document.getElementById('gradeChart'), {
+                type: 'pie',
+                data: {
+                    labels: grades,
+                    datasets: [{ data: gradeCounts, backgroundColor: COLORS.slice(0, grades.length), borderWidth: 2 }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        // Bar chart — student name vs percentage
+        const students = data.students || [];
+        if (students.length > 0) {
+            const names = students.map(s => s.name);
+            const percentages = students.map(s => s.percentage);
+            const barColors = students.map(s => s.isPassed ? '#4CAF50' : '#F44336');
+
+            window._studentChart = new Chart(document.getElementById('studentChart'), {
+                type: 'bar',
+                data: {
+                    labels: names,
+                    datasets: [{
+                        label: 'Percentage %',
+                        data: percentages,
+                        backgroundColor: barColors,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Student results table
+        const sTable = document.getElementById('studentResultsTable');
+        while (sTable.rows.length > 1) sTable.deleteRow(1);
+        if (students.length > 0) {
+            students.forEach(s => {
+                const row = sTable.insertRow();
+                row.innerHTML = `
+                    <td>${s.name}</td>
+                    <td>${s.rollNumber}</td>
+                    <td>${s.examType}</td>
+                    <td>${s.percentage}%</td>
+                    <td>${s.grade}</td>
+                    <td style="color:${s.isPassed ? 'green' : 'red'}">${s.isPassed ? 'Pass' : 'Fail'}</td>
+                `;
+            });
+        } else {
+            const row = sTable.insertRow();
+            row.innerHTML = '<td colspan="6" style="text-align:center;">No results found for this class.</td>';
+        }
+
+        loadToppers(cls, section, examType, academicYear);
+
     } catch {
         statusMsg.textContent = 'Cannot connect to server.';
     }
