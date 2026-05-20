@@ -41,8 +41,8 @@ app.use('/api/results', require('./routes/resultRoutes'));
 app.get('/health', (req, res) => res.json({ success: true, message: 'Server is running' }));
 
 // Serve frontend static files
-app.use(express.static(path.join(__dirname, '../PROJECT')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../PROJECT', 'index.html')));
+app.use(express.static(path.join(__dirname, '../public')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../public', 'index.html')));
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
