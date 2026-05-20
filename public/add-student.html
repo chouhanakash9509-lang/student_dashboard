@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Add Student</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Add Student</h2>
+<a href="Dashbord.html">← Back to Dashboard</a>
+
+<div id="error-msg" style="color:red;margin:10px 0;display:none;"></div>
+<div id="success-msg" style="color:green;margin:10px 0;display:none;"></div>
+
+<form class="form" id="addStudentForm">
+
+<input type="text" id="name" placeholder="Student Name" required>
+<input type="text" id="rollNumber" placeholder="Roll Number" required>
+<input type="text" id="class" placeholder="Class (e.g. B.Tech)" required>
+<input type="text" id="section" placeholder="Section (e.g. A)" required>
+
+<button type="submit">Add Student</button>
+
+</form>
+
+</div>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('token');
+
+if (!token) window.location.href = 'index.html';
+
+document.getElementById('addStudentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorMsg = document.getElementById('error-msg');
+    const successMsg = document.getElementById('success-msg');
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
+
+    const body = {
+        name: document.getElementById('name').value,
+        rollNumber: document.getElementById('rollNumber').value,
+        class: document.getElementById('class').value,
+        section: document.getElementById('section').value,
+    };
+
+    try {
+        const res = await fetch(`${API}/students`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            successMsg.textContent = 'Student added successfully!';
+            successMsg.style.display = 'block';
+            e.target.reset();
+        } else if (res.status === 403) {
+            errorMsg.textContent = 'Access denied. Only Admin or Teacher can add students. Please login with an admin/teacher account.';
+            errorMsg.style.display = 'block';
+        } else {
+            errorMsg.textContent = (data.errors ? data.errors.join(', ') : data.message) || 'Failed to add student';
+            errorMsg.style.display = 'block';
+        }
+    } catch (err) {
+        errorMsg.textContent = 'Cannot connect to server.';
+        errorMsg.style.display = 'block';
+    }
+});
+</script>
+
+</body>
+</html>

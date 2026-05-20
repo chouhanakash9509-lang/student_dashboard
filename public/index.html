@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Portal Login</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="left-section">
+        <div class="login-box">
+            <h1>Indian Institute Of Technology Patna</h1>
+            <h2>Login</h2>
+            <p class="subtitle">Enter your account details</p>
+
+            <div id="error-msg" style="color:red;margin-bottom:10px;display:none;"></div>
+
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="Enter email" required>
+                </div>
+
+                <div class="input-group password-group">
+                    <label>Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" placeholder="Enter password" required>
+                        <span class="toggle" onclick="togglePassword()">👁</span>
+                    </div>
+                </div>
+
+                <div class="forgot"><a href="#">Forgot Password?</a></div>
+
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+
+            <div class="signup">
+                <span>Don't have an account?</span>
+                <a href="signup.html"><button class="signup-btn">Sign up</button></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-section">
+        <div class="glass-box">
+            <h1>Welcome to Student Portal of IIT PATNA</h1>
+            <p>Login to access your account</p>
+            <img src="authentication.png" class="authentication">
+        </div>
+    </div>
+
+</div>
+
+<script>
+const API = '/api';
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorMsg = document.getElementById('error-msg');
+    errorMsg.style.display = 'none';
+
+    try {
+        const res = await fetch(`${API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+            localStorage.setItem('token', data.token);
+            window.location.href = 'Dashbord.html';
+        } else {
+            errorMsg.textContent = data.message || 'Invalid credentials';
+            errorMsg.style.display = 'block';
+        }
+    } catch (err) {
+        errorMsg.textContent = 'Cannot connect to server. Make sure backend is running.';
+        errorMsg.style.display = 'block';
+    }
+});
+
+function togglePassword() {
+    const password = document.getElementById("password");
+    password.type = password.type === "password" ? "text" : "password";
+}
+</script>
+
+</body>
+</html>

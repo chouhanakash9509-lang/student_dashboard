@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>View Students</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Students List</h2>
+<a href="Dashbord.html">← Back to Dashboard</a>
+
+<input type="text" id="search" placeholder="Search student..." class="search" oninput="searchStudents()">
+
+<p id="status-msg" style="color:gray;"></p>
+
+<table id="studentsTable">
+<tr>
+<th>Roll No</th>
+<th>Name</th>
+<th>Class</th>
+<th>Section</th>
+<th>Action</th>
+</tr>
+</table>
+
+</div>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('token');
+
+if (!token) window.location.href = 'index.html';
+
+async function loadStudents(search = '') {
+    const statusMsg = document.getElementById('status-msg');
+    statusMsg.textContent = 'Loading...';
+    const url = search ? `${API}/students?search=${encodeURIComponent(search)}` : `${API}/students`;
+
+    try {
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const table = document.getElementById('studentsTable');
+
+        // Remove old rows except header
+        while (table.rows.length > 1) table.deleteRow(1);
+
+        if (data.success && data.data.length > 0) {
+            statusMsg.textContent = `Total: ${data.total} students`;
+            data.data.forEach(s => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${s.rollNumber}</td>
+                    <td>${s.name}</td>
+                    <td>${s.class}</td>
+                    <td>${s.section}</td>
+                    <td><button onclick="deleteStudent('${s._id}')">Delete</button></td>
+                `;
+            });
+        } else {
+            statusMsg.textContent = 'No students found.';
+        }
+    } catch (err) {
+        statusMsg.textContent = 'Cannot connect to server.';
+    }
+}
+
+async function deleteStudent(id) {
+    if (!confirm('Delete this student?')) return;
+    try {
+        const res = await fetch(`${API}/students/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) loadStudents();
+        else alert(data.message || 'Delete failed');
+    } catch {
+        alert('Cannot connect to server.');
+    }
+}
+
+let searchTimer;
+function searchStudents() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadStudents(document.getElementById('search').value), 400);
+}
+
+loadStudents();
+</script>
+
+</body>
+</html>
